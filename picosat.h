@@ -51,6 +51,10 @@ IN THE SOFTWARE.
 
 typedef struct PicoSAT PicoSAT;
 
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
 /*------------------------------------------------------------------------*/
 
 const char *picosat_version (void);
@@ -655,4 +659,8 @@ void picosat_write_rup_trace (PicoSAT *, FILE * trace_file);
 
 int picosat_usedlit (PicoSAT *, int lit);
 /*------------------------------------------------------------------------*/
+
+#if defined (__cplusplus)
+}
+#endif
 #endif
