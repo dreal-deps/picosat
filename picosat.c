@@ -2382,7 +2382,7 @@ REENTER:
 	  for (p = ps->added; p < ps->ahead; p++) 
 	    {
 	      lit = *p;
-	      if (lit->val)
+	      if (lit->val && ps->levels)
 		{
 		  litlevel = LIT2VAR (lit)->level;
 		  assert (litlevel <= ps->LEVEL);
@@ -2403,7 +2403,7 @@ REENTER:
 		      glue++;
 		    }
 		}
-	      else
+	      else if (!lit->val)
 		glue++;
 	    }
 
@@ -2817,8 +2817,9 @@ fix_impl_lits (PS * ps, long delta)
   Lit ** p;
 
   for (s = ps->impls + 2; s <= ps->impls + 2 * ps->max_var + 1; s++)
-    for (p = s->start; p < s->start + s->count; p++)
-      *p += delta;
+    if (s->start)
+      for (p = s->start; p < s->start + s->count; p++)
+        *p += delta;
 }
 #endif
 
@@ -3429,6 +3430,8 @@ satisfied (PS * ps)
     return 0;
   assert (!ps->conflict);
   assert (bcp_queue_is_empty (ps));
+  if (ps->trail == NULL)
+    return ps->thead == NULL;
   return ps->thead == ps->trail + ps->max_var;	/* all assigned */
 }
 
@@ -3900,40 +3903,43 @@ prop2 (PS * ps, Lit * this)
 
 #ifdef NO_BINARY_CLAUSES
   lstk = LIT2IMPLS (this);
-  start = lstk->start;
-  l = start + lstk->count;
-  while (l != start)
+  if (lstk->count)
     {
-      /* The counter 'visits' is the number of clauses that are
-       * visited during propagations of assignments.
-       */
-      ps->visits++;
+      start = lstk->start;
+      l = start + lstk->count;
+      while (l != start)
+        {
+          /* The counter 'visits' is the number of clauses that are
+          * visited during propagations of assignments.
+          */
+          ps->visits++;
 #ifdef STATS
-      ps->bvisits++;
+          ps->bvisits++;
 #endif
-      other = *--l;
-      tmp = other->val;
+          other = *--l;
+          tmp = other->val;
 
-      if (tmp == TRUE)
-	{
+          if (tmp == TRUE)
+            {
 #ifdef STATS
-	  ps->othertrue++;
-	  ps->othertrue2++;
-	  if (LIT2VAR (other)->level < ps->LEVEL)
-	    ps->othertrue2u++;
+              ps->othertrue++;
+              ps->othertrue2++;
+              if (LIT2VAR (other)->level < ps->LEVEL)
+                ps->othertrue2u++;
 #endif
-	  continue;
-	}
+              continue;
+            }
 
-      if (tmp != FALSE)
-	{
-	  assign_forced (ps, other, LIT2REASON (NOTLIT(this)));
-	  continue;
-	}
+          if (tmp != FALSE)
+            {
+              assign_forced (ps, other, LIT2REASON (NOTLIT(this)));
+              continue;
+            }
 
-      if (ps->conflict == &ps->cimpl)
-	resetcimpl (ps);
-      ps->conflict = setcimpl (ps, this, other);
+          if (ps->conflict == &ps->cimpl)
+            resetcimpl (ps);
+          ps->conflict = setcimpl (ps, this, other);
+        }
     }
 #else
   /* Traverse all binary clauses with 'this'.  Head/Tail pointers for binary
@@ -4708,7 +4714,7 @@ collect_clauses (PS * ps)
 	      Ltk * lstk = LIT2IMPLS (lit);
 	      Lit ** r, ** s;
 	      r = lstk->start;
-	      if (lit->val != TRUE || LIT2VAR (lit)->level)
+	      if (lstk->count && (lit->val != TRUE || LIT2VAR (lit)->level))
 		for (s = r; s < lstk->start + lstk->count; s++)
 		  {
 		    Lit * other = *s;
